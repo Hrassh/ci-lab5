@@ -1,0 +1,48 @@
+name: CI
+
+# Запускати при кожному push у гілку main
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build:
+    # Середовище
+    runs-on: ubuntu-latest
+
+    steps:
+      #  Завантажити код репозиторію
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      #  Встановити Node.js
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      # Встановити залежності з package.json
+      - name: Install dependencies
+        run: npm install
+
+      # Запустити білд
+      - name: Build
+        run: npm run build
+
+      # Перевірити, що результат білду існує
+      - name: Check build result
+        run: |
+          if [ -d dist ]; then
+            echo "Build OK"
+            ls -la dist
+          else
+            echo "Build folder not found"
+            exit 1
+          fi
+
+      #  Зберегти результат білду як артефакт
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: build-output
+          path: dist/
