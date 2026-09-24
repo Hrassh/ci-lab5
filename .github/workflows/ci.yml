@@ -46,3 +46,32 @@ jobs:
         with:
           name: build-output
           path: dist/
+      #  Розшифрувати SSH-ключ із секрету
+      - name: Decode SSH key
+        run: |
+          echo "${{ secrets.EC2_SSH_KEY_B64 }}" | base64 -d > ec2-key.pem
+          chmod 600 ec2-key.pem
+
+      # Скопіювати файли проєкту на EC2
+      - name: Copy files to EC2
+        run: |
+          rsync -avz \
+            --exclude 'node_modules' --exclude '.git' --exclude 'ec2-key.pem' \
+            -e "ssh -i ec2-key.pem -o StrictHostKeyChecking=no" \
+            ./ ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:~/nodeapp
+
+      #  Встановити залежності й запустити застосунок на EC2
+      - name: Run app on EC2
+        run: |
+          ssh -i ec2-key.pem -o StrictHostKeyChecking=no ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+            if ! command -v node > /dev/null; then
+              curl -fsSL https://deb.nodesource.com/setup_22.x | sudo -E bash -
+              sudo apt-get install -y nodejs
+            fi
+            if ! command -v pm2 > /dev/null; then
+              sudo npm install -g pm2
+            fi
+            cd ~/nodeapp
+            npm install
+            pm2 restart all || pm2 start index.js
+          EOF
